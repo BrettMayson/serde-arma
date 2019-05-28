@@ -113,14 +113,22 @@ impl<'de> Deserializer<'de> {
             }
         } else if self.peek_char()? == '"' {
             self.next_char()?;
-            match self.input.find('"') {
-                Some(len) => {
-                    let s = &self.input[..len];
-                    self.input = &self.input[len + 1..];
-                    Ok(s)
+            let mut s = String::new();
+            loop {
+                let c = self.next_char()?;
+                if c == '"' {
+                    if self.peek_char()? == '"' {
+                        self.next_char()?;
+                        s.push('"');
+                    } else {
+                        break;
+                    }
+                } else {
+                    s.push(c);
                 }
-                None => Err(Error::Eof),
             }
+            let sstr: &'static str = Box::leak(s.into_boxed_str());
+            Ok(sstr)
         } else {
             match self.input.find('=') {
                 Some(len) => {
@@ -457,6 +465,21 @@ string = "Hello";
     };
     assert_eq!(expected, from_str(j).unwrap());
 }
+
+#[test]
+fn test_escape() {
+    #[derive(Deserialize, PartialEq, Debug)]
+    struct Test {
+        escape: String,
+    }
+
+    let j = r#"escape = "Hello ""World""";"#;
+    let expected = Test {
+        escape: "Hello \"World\"".to_string(),
+    };
+    assert_eq!(expected, from_str(j).unwrap());
+}
+
 
 #[test]
 fn test_array() {
