@@ -1,6 +1,6 @@
 # serde-arma
 
-Use Arma configs as Rust structures or convert to JSON, TOML, or any serde compatible format.
+Use Arma configs as Rust structs or convert to JSON, TOML, or any serde compatible format.
 
 # Example
 
