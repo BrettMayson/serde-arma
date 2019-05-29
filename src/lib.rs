@@ -105,7 +105,9 @@ impl<'de> Deserializer<'de> {
         if self.next_is_class {
             let spc_pos = self.input.find(' ').unwrap_or(1000);
             let nl_pos = self.input.find('\n').unwrap_or(1000);
-            let mut pos = Some(if spc_pos < nl_pos { spc_pos } else { nl_pos });
+            let br_pos = self.input.find('{').unwrap_or(1000);
+            let f_pos = if spc_pos < nl_pos { spc_pos } else { nl_pos };
+            let mut pos = Some(if f_pos < br_pos { f_pos } else {br_pos});
             if pos == Some(1000) {
                 pos = None
             }
@@ -127,7 +129,12 @@ impl<'de> Deserializer<'de> {
                         self.next_char()?;
                         s.push('"');
                     } else {
-                        break;
+                        if self.input.starts_with(" \\n \"") {
+                            self.input = &self.input[" \\n \"".len()..];
+                            s.push('\n');
+                        } else {
+                            break;
+                        }
                     }
                 } else {
                     s.push(c);
@@ -577,13 +584,25 @@ fn test_class_empty() {
     #[derive(Deserialize, PartialEq, Debug)]
     struct Child {}
 
-    let j = r#"numbers[] = {1,2,3};after="hi";
-class child {};
-    "#;
+    let j = r#"numbers[] = {1,2,3};after="hi";class child{};"#;
     let expected = Test {
         numbers: vec![1,2,3],
         after: "hi".to_string(),
         child: Child {}
+    };
+    assert_eq!(expected, from_str(j).unwrap());
+}
+
+#[test]
+fn test_dumb_newline() {
+    #[derive(Deserialize, PartialEq, Debug)]
+    struct Test {
+        string: String,
+    }
+
+    let j = r#"string = "this is so dumb" \n "why would you do this";"#;
+    let expected = Test {
+        string: "this is so dumb\nwhy would you do this".to_string(),
     };
     assert_eq!(expected, from_str(j).unwrap());
 }
