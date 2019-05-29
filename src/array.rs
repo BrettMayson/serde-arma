@@ -25,15 +25,36 @@ impl<'de, 'a> SeqAccess<'de> for CommaSeparated<'a, 'de> {
     where
         T: DeserializeSeed<'de>,
     {
+        loop {
+            if crate::WHITESPACE.contains(self.de.peek_char()?) {
+                self.de.next_char()?;
+            } else {
+                break;
+            }
+        }
         // Check if there are no more elements.
         if self.de.peek_char()? == '}' {
             return Ok(None);
+        }
+        loop {
+            if crate::WHITESPACE.contains(self.de.peek_char()?) {
+                self.de.next_char()?;
+            } else {
+                break;
+            }
         }
         // Comma is required before every element except the first.
         if !self.first && self.de.next_char()? != ',' {
             return Err(Error::ExpectedArrayComma);
         }
         self.first = false;
+        loop {
+            if crate::WHITESPACE.contains(self.de.peek_char()?) {
+                self.de.next_char()?;
+            } else {
+                break;
+            }
+        }
         // Deserialize an array element.
         seed.deserialize(&mut *self.de).map(Some)
     }

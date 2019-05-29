@@ -15,13 +15,15 @@ use crate::class::ArmaClass;
 use crate::error::{Error, Result};
 
 lazy_static! {
-    static ref WHITESPACE: String = String::from(" \r\n");
+    static ref WHITESPACE: String = String::from(" \r\n\t");
+    static ref DIGIT_END: String = String::from(";,} \r\n\t");
 }
 
 pub struct Deserializer<'de> {
     input: &'de str,
     next_is_class: bool,
     next_is_key: bool,
+    first_reader: bool,
 }
 
 impl<'de> Deserializer<'de> {
@@ -30,6 +32,18 @@ impl<'de> Deserializer<'de> {
             input,
             next_is_class: false,
             next_is_key: false,
+            first_reader: false,
+        }
+    }
+    pub fn from_reader<R: std::io::Read>(mut reader: R) -> Self {
+        let mut text = String::new();
+        reader.read_to_string(&mut text).unwrap();
+        let sstr: &'static str = Box::leak(text.into_boxed_str());
+        Deserializer {
+            input: sstr,
+            next_is_class: false,
+            next_is_key: false,
+            first_reader: true,
         }
     }
 }
@@ -47,6 +61,13 @@ where
     }
 }
 
+pub fn from_reader<'a, R>(reader: R) -> Deserializer<'a>
+where
+    R: std::io::Read,
+{
+    Deserializer::from_reader(reader)
+}
+
 impl<'de> Deserializer<'de> {
     fn peek_char(&mut self) -> Result<char> {
         self.input.chars().next().ok_or(Error::Eof)
@@ -60,33 +81,47 @@ impl<'de> Deserializer<'de> {
 
     fn parse_unsigned<T>(&mut self) -> Result<T>
     where
-        T: AddAssign<T> + MulAssign<T> + From<u8>,
+        T: AddAssign<T> + MulAssign<T> + std::str::FromStr + std::fmt::Debug,
+        <T as std::str::FromStr>::Err: std::fmt::Debug,
     {
-        let mut int = match self.next_char()? {
-            ch @ '0'...'9' => T::from(ch as u8 - b'0'),
-            _ => {
-                return Err(Error::ExpectedInteger);
-            }
-        };
+        let mut s = String::new();
         loop {
-            match self.input.chars().next() {
-                Some(ch @ '0'...'9') => {
-                    self.input = &self.input[1..];
-                    int *= T::from(10);
-                    int += T::from(ch as u8 - b'0');
-                }
-                _ => {
-                    return Ok(int);
-                }
+            if DIGIT_END.contains(self.peek_char()?) {
+                return Ok(s.parse::<T>().unwrap());
+            } else {
+                s.push(self.next_char()?);
             }
         }
     }
 
     fn parse_signed<T>(&mut self) -> Result<T>
     where
-        T: Neg<Output = T> + AddAssign<T> + MulAssign<T> + From<i8>,
+        T: Neg<Output = T> + AddAssign<T> + MulAssign<T> + std::str::FromStr + std::fmt::Debug,
+        <T as std::str::FromStr>::Err: std::fmt::Debug,
     {
-        unimplemented!()
+        let mut s = String::new();
+        loop {
+            if DIGIT_END.contains(self.peek_char()?) {
+                return Ok(s.parse::<T>().unwrap());
+            } else {
+                s.push(self.next_char()?);
+            }
+        }
+    }
+
+    fn parse_float<T>(&mut self) -> Result<T>
+    where
+        T: Neg<Output = T> + AddAssign<T> + MulAssign<T> + std::str::FromStr + std::fmt::Debug,
+        <T as std::str::FromStr>::Err: std::fmt::Debug,
+    {
+        let mut s = String::new();
+        loop {
+            if DIGIT_END.contains(self.peek_char()?) {
+                return Ok(s.parse::<T>().unwrap());
+            } else {
+                s.push(self.next_char()?);
+            }
+        }
     }
 
     fn parse_bool(&mut self) -> Result<bool> {
@@ -165,7 +200,10 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
-        if self.next_is_key {
+        if self.first_reader {
+            self.first_reader = false;
+            self.deserialize_struct("", &[], visitor)
+        } else if self.next_is_key {
             self.next_is_key = false;
             self.deserialize_str(visitor)
         } else {
@@ -173,8 +211,24 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
                 'n' => self.deserialize_unit(visitor),
                 't' | 'f' => self.deserialize_bool(visitor),
                 '"' => self.deserialize_str(visitor),
-                '0'...'9' => self.deserialize_u64(visitor),
-                '-' => self.deserialize_i64(visitor),
+                '0'...'9' | '-' => {
+                    let mut s = String::new();
+                    let mut i = 0;
+                    loop {
+                        if DIGIT_END.contains(self.input.chars().nth(i).unwrap()) {
+                            if s.contains('.') {
+                                return self.deserialize_f64(visitor);
+                            } else if s.contains('-') {
+                                return self.deserialize_i64(visitor);
+                            } else {
+                                return self.deserialize_u64(visitor);
+                            }
+                        } else {
+                            s.push(self.input.chars().nth(i).unwrap());
+                            i += 1;
+                        }
+                    }
+                },
                 '{' => {
                     if self.next_is_class {
                         self.next_is_class = false;
@@ -252,19 +306,19 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     }
 
     // Float parsing is stupidly hard.
-    fn deserialize_f32<V>(self, _visitor: V) -> Result<V::Value>
+    fn deserialize_f32<V>(self, visitor: V) -> Result<V::Value>
     where
         V: Visitor<'de>,
     {
-        unimplemented!()
+        visitor.visit_f32(self.parse_float()?)
     }
 
     // Float parsing is stupidly hard.
-    fn deserialize_f64<V>(self, _visitor: V) -> Result<V::Value>
+    fn deserialize_f64<V>(self, visitor: V) -> Result<V::Value>
     where
         V: Visitor<'de>,
     {
-        unimplemented!()
+        visitor.visit_f32(self.parse_float()?)
     }
 
     fn deserialize_char<V>(self, _visitor: V) -> Result<V::Value>
@@ -503,6 +557,28 @@ fn test_array() {
     }
 
     let j = r#"numbers[] = {1,2,3};after="hi";"#;
+    let expected = Test {
+        numbers: vec![1,2,3],
+        after: "hi".to_string(),
+    };
+    assert_eq!(expected, from_str(j).unwrap());
+}
+
+#[test]
+fn test_array_newline() {
+    #[derive(Deserialize, PartialEq, Debug)]
+    struct Test {
+        numbers: Vec<u8>,
+        after: String,
+    }
+
+    let j = r#"numbers[]=
+{
+    1,
+    2,
+    3
+};
+after="hi";"#;
     let expected = Test {
         numbers: vec![1,2,3],
         after: "hi".to_string(),

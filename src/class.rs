@@ -40,8 +40,8 @@ impl<'de, 'a> MapAccess<'de> for ArmaClass<'a, 'de> {
             return Ok(None);
         }
 
-        if self.de.input.starts_with("class") {
-            self.de.input = &self.de.input["class".len()..];
+        if self.de.input.starts_with("class ") {
+            self.de.input = &self.de.input["class ".len()..];
             self.de.next_is_class = true;
             loop {
                 if crate::WHITESPACE.contains(self.de.peek_char()?) {
