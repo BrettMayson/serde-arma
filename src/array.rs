@@ -2,9 +2,6 @@ use serde::de::{DeserializeSeed, SeqAccess};
 
 use crate::error::{Error, Result};
 
-// In order to handle commas correctly when deserializing a JSON array or map,
-// we need to track whether we are on the first element or past the first
-// element.
 pub struct CommaSeparated<'a, 'de: 'a> {
     de: &'a mut crate::Deserializer<'de>,
     first: bool,

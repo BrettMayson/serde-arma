@@ -103,7 +103,13 @@ impl<'de> Deserializer<'de> {
 
     fn parse_string(&mut self) -> Result<&'de str> {
         if self.next_is_class {
-            match self.input.find(' ') {
+            let spc_pos = self.input.find(' ').unwrap_or(1000);
+            let nl_pos = self.input.find('\n').unwrap_or(1000);
+            let mut pos = Some(if spc_pos < nl_pos { spc_pos } else { nl_pos });
+            if pos == Some(1000) {
+                pos = None
+            }
+            match pos {
                 Some(len) => {
                     let s = &self.input[..len].trim();
                     self.input = &self.input[len..];
@@ -498,7 +504,39 @@ fn test_array() {
 }
 
 #[test]
-fn test_class() {
+fn test_class_newline() {
+    #[derive(Deserialize, PartialEq, Debug)]
+    struct Test {
+        numbers: Vec<u8>,
+        after: String,
+        child: Child,
+    }
+    #[derive(Deserialize, PartialEq, Debug)]
+    struct Child {
+        number: u32,
+        string: String,
+    }
+
+    let j = r#"numbers[] = {1,2,3};after="hi";
+class child
+{
+    number= 123;
+    string ="Hello";
+};
+    "#;
+    let expected = Test {
+        numbers: vec![1,2,3],
+        after: "hi".to_string(),
+        child: Child {
+            number: 123,
+            string: "Hello".to_string(),
+        }
+    };
+    assert_eq!(expected, from_str(j).unwrap());
+}
+
+#[test]
+fn test_class_sameline() {
     #[derive(Deserialize, PartialEq, Debug)]
     struct Test {
         numbers: Vec<u8>,
@@ -524,6 +562,28 @@ class child {
             number: 123,
             string: "Hello".to_string(),
         }
+    };
+    assert_eq!(expected, from_str(j).unwrap());
+}
+
+#[test]
+fn test_class_empty() {
+    #[derive(Deserialize, PartialEq, Debug)]
+    struct Test {
+        numbers: Vec<u8>,
+        after: String,
+        child: Child,
+    }
+    #[derive(Deserialize, PartialEq, Debug)]
+    struct Child {}
+
+    let j = r#"numbers[] = {1,2,3};after="hi";
+class child {};
+    "#;
+    let expected = Test {
+        numbers: vec![1,2,3],
+        after: "hi".to_string(),
+        child: Child {}
     };
     assert_eq!(expected, from_str(j).unwrap());
 }
