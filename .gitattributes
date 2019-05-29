@@ -1,2 +1,2 @@
-example.hpp linguist-vendored=false
-example.json linguist-vendored=false
+tests/example.hpp linguist-vendored=false
+tests/example.json linguist-vendored=false

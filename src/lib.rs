@@ -138,21 +138,19 @@ impl<'de> Deserializer<'de> {
 
     fn parse_string(&mut self) -> Result<&'de str> {
         if self.next_is_class {
-            let spc_pos = self.input.find(' ').unwrap_or(1000);
-            let nl_pos = self.input.find('\n').unwrap_or(1000);
-            let br_pos = self.input.find('{').unwrap_or(1000);
-            let f_pos = if spc_pos < nl_pos { spc_pos } else { nl_pos };
-            let mut pos = Some(if f_pos < br_pos { f_pos } else {br_pos});
-            if pos == Some(1000) {
-                pos = None
-            }
-            match pos {
-                Some(len) => {
-                    let s = &self.input[..len].trim();
-                    self.input = &self.input[len..];
-                    Ok(s)
+            let mut s = String::new();
+            let mut i = 0;
+            let mut stop = WHITESPACE.clone();
+            stop.push('{');
+            loop {
+                if stop.contains(self.input.chars().nth(i).unwrap()) {
+                    let s = &self.input[..i].trim();
+                    self.input = &self.input[i..];
+                    return Ok(s);
+                } else {
+                    s.push(self.input.chars().nth(i).unwrap());
+                    i += 1;
                 }
-                None => Err(Error::Eof),
             }
         } else if self.peek_char()? == '"' {
             self.next_char()?;
@@ -511,174 +509,4 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     {
         self.deserialize_any(visitor)
     }
-}
-
-///////////////////
-
-#[test]
-fn test_struct() {
-    #[derive(Deserialize, PartialEq, Debug)]
-    struct Test {
-        int: u32,
-        string: String,
-    }
-
-    let j = r#"int = 123;
-string = "Hello";
-"#;
-    let expected = Test {
-        int: 123,
-        string: "Hello".to_string(),
-    };
-    assert_eq!(expected, from_str(j).unwrap());
-}
-
-#[test]
-fn test_escape() {
-    #[derive(Deserialize, PartialEq, Debug)]
-    struct Test {
-        escape: String,
-    }
-
-    let j = r#"escape = "Hello ""World""";"#;
-    let expected = Test {
-        escape: "Hello \"World\"".to_string(),
-    };
-    assert_eq!(expected, from_str(j).unwrap());
-}
-
-
-#[test]
-fn test_array() {
-    #[derive(Deserialize, PartialEq, Debug)]
-    struct Test {
-        numbers: Vec<u8>,
-        after: String,
-    }
-
-    let j = r#"numbers[] = {1,2,3};after="hi";"#;
-    let expected = Test {
-        numbers: vec![1,2,3],
-        after: "hi".to_string(),
-    };
-    assert_eq!(expected, from_str(j).unwrap());
-}
-
-#[test]
-fn test_array_newline() {
-    #[derive(Deserialize, PartialEq, Debug)]
-    struct Test {
-        numbers: Vec<u8>,
-        after: String,
-    }
-
-    let j = r#"numbers[]=
-{
-    1,
-    2,
-    3
-};
-after="hi";"#;
-    let expected = Test {
-        numbers: vec![1,2,3],
-        after: "hi".to_string(),
-    };
-    assert_eq!(expected, from_str(j).unwrap());
-}
-
-#[test]
-fn test_class_newline() {
-    #[derive(Deserialize, PartialEq, Debug)]
-    struct Test {
-        numbers: Vec<u8>,
-        after: String,
-        child: Child,
-    }
-    #[derive(Deserialize, PartialEq, Debug)]
-    struct Child {
-        number: u32,
-        string: String,
-    }
-
-    let j = r#"numbers[] = {1,2,3};after="hi";
-class child
-{
-    number= 123;
-    string ="Hello";
-};
-    "#;
-    let expected = Test {
-        numbers: vec![1,2,3],
-        after: "hi".to_string(),
-        child: Child {
-            number: 123,
-            string: "Hello".to_string(),
-        }
-    };
-    assert_eq!(expected, from_str(j).unwrap());
-}
-
-#[test]
-fn test_class_sameline() {
-    #[derive(Deserialize, PartialEq, Debug)]
-    struct Test {
-        numbers: Vec<u8>,
-        after: String,
-        child: Child,
-    }
-    #[derive(Deserialize, PartialEq, Debug)]
-    struct Child {
-        number: u32,
-        string: String,
-    }
-
-    let j = r#"numbers[] = {1,2,3};after="hi";
-class child {
-    number= 123;
-    string ="Hello";
-};
-    "#;
-    let expected = Test {
-        numbers: vec![1,2,3],
-        after: "hi".to_string(),
-        child: Child {
-            number: 123,
-            string: "Hello".to_string(),
-        }
-    };
-    assert_eq!(expected, from_str(j).unwrap());
-}
-
-#[test]
-fn test_class_empty() {
-    #[derive(Deserialize, PartialEq, Debug)]
-    struct Test {
-        numbers: Vec<u8>,
-        after: String,
-        child: Child,
-    }
-    #[derive(Deserialize, PartialEq, Debug)]
-    struct Child {}
-
-    let j = r#"numbers[] = {1,2,3};after="hi";class child{};"#;
-    let expected = Test {
-        numbers: vec![1,2,3],
-        after: "hi".to_string(),
-        child: Child {}
-    };
-    assert_eq!(expected, from_str(j).unwrap());
-}
-
-#[test]
-fn test_dumb_newline() {
-    #[derive(Deserialize, PartialEq, Debug)]
-    struct Test {
-        string: String,
-    }
-
-    let j = r#"string = "this is so dumb" \n "why would you do this";"#;
-    let expected = Test {
-        string: "this is so dumb\nwhy would you do this".to_string(),
-    };
-    assert_eq!(expected, from_str(j).unwrap());
 }

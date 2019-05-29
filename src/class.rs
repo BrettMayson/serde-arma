@@ -55,6 +55,7 @@ impl<'de, 'a> MapAccess<'de> for ArmaClass<'a, 'de> {
         // Deserialize a map key.
         self.de.next_is_key = true;
         let key = seed.deserialize(&mut *self.de).map(Some);
+        self.de.next_is_key = false;
         key
     }
 
