@@ -1,5 +1,5 @@
 [package]
-name = "armaconfig"
+name = "serde-arma"
 version = "0.1.0"
 authors = ["Brett <brett@bmandesigns.com>"]
 edition = "2018"
