@@ -9,6 +9,7 @@ class EditorData
 	class ItemIDProvider
 	{
 		nextID=1306;
+        tryAsset[] = {0, {"C_Marshal_F", {"nil", "nil", "hgun_Pistol_Signal_F"}}, "Kart_01_Base_F"};
 	};
 	class MarkerIDProvider
 	{
@@ -25,6 +26,9 @@ class EditorData
 		up[]={0.39724031,0.90911514,0.12531079};
 		aside[]={0.30084822,-1.5593832e-007,-0.95369172};
 	};
+    class ExtraStuffNotReal {
+        aiRateOfFire = 1e-006;
+    };
 };
 binarizationWanted=0;
 addons[]=

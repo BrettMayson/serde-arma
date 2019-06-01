@@ -7,7 +7,19 @@
     "autoGroupingDist": 10,
     "toggles": 9,
     "ItemIDProvider": {
-      "nextID": 1306
+      "nextID": 1306,
+      "tryAsset": [
+        0,
+        [
+          "C_Marshal_F",
+          [
+            "nil",
+            "nil",
+            "hgun_Pistol_Signal_F"
+          ]
+        ],
+        "Kart_01_Base_F"
+      ]
     },
     "MarkerIDProvider": {
       "nextID": 109
@@ -36,6 +48,9 @@
         -1.5593832e-7,
         -0.9536917
       ]
+    },
+    "ExtraStuffNotReal": {
+      "aiRateOfFire": 0.000001
     }
   },
   "binarizationWanted": 0,

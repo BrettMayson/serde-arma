@@ -143,13 +143,18 @@ impl<'de> Deserializer<'de> {
             let mut stop = WHITESPACE.clone();
             stop.push('{');
             loop {
-                if stop.contains(self.input.chars().nth(i).unwrap()) {
-                    let s = &self.input[..i].trim();
-                    self.input = &self.input[i..];
-                    return Ok(s);
+                if self.input.chars().nth(i).unwrap() == ':' && self.input.chars().nth(i+1).unwrap() == ' ' {
+                    s.push(':');
+                    i += 2;
                 } else {
-                    s.push(self.input.chars().nth(i).unwrap());
-                    i += 1;
+                    if stop.contains(self.input.chars().nth(i).unwrap()) {
+                        let s = &self.input[..i].trim();
+                        self.input = &self.input[i..];
+                        return Ok(s);
+                    } else {
+                        s.push(self.input.chars().nth(i).unwrap());
+                        i += 1;
+                    }
                 }
             }
         } else if self.peek_char()? == '"' {
@@ -214,7 +219,9 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
                     let mut i = 0;
                     loop {
                         if DIGIT_END.contains(self.input.chars().nth(i).unwrap()) {
-                            if s.contains('.') {
+                            if s.contains("e") {
+                                return self.deserialize_f64(visitor);
+                            } else if s.contains('.') {
                                 return self.deserialize_f64(visitor);
                             } else if s.contains('-') {
                                 return self.deserialize_i64(visitor);
