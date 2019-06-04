@@ -26,18 +26,18 @@ impl<'de, 'a> SeqAccess<'de> for CommaSeparated<'a, 'de> {
         T: DeserializeSeed<'de>,
     {
         loop {
-            if crate::WHITESPACE.contains(self.de.peek_char()?) {
+            if crate::WHITESPACE.contains(self.de.peek_char()) {
                 self.de.next_char()?;
             } else {
                 break;
             }
         }
         // Check if there are no more elements.
-        if self.de.peek_char()? == '}' {
+        if self.de.peek_char() == '}' {
             return Ok(None);
         }
         loop {
-            if crate::WHITESPACE.contains(self.de.peek_char()?) {
+            if crate::WHITESPACE.contains(self.de.peek_char()) {
                 self.de.next_char()?;
             } else {
                 break;
@@ -49,7 +49,7 @@ impl<'de, 'a> SeqAccess<'de> for CommaSeparated<'a, 'de> {
         }
         self.first = false;
         loop {
-            if crate::WHITESPACE.contains(self.de.peek_char()?) {
+            if crate::WHITESPACE.contains(self.de.peek_char()) {
                 self.de.next_char()?;
             } else {
                 break;

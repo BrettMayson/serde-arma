@@ -26,17 +26,18 @@ impl<'de, 'a> MapAccess<'de> for ArmaClass<'a, 'de> {
         // Check if there are no more entries.
         loop {
             let peek = self.de.peek_char();
-            if let Err(_) = peek {
-                return Ok(None);
-            }
-            if crate::WHITESPACE.contains(peek?) {
+            if crate::WHITESPACE.contains(peek) {
                 self.de.next_char()?;
             } else {
                 break;
             }
         }
-        if self.de.peek_char()? == '}' {
+        if self.de.peek_char() == '}' {
             self.de.next_char()?;
+            return Ok(None);
+        }
+
+        if self.de.peek_char() == '?' {
             return Ok(None);
         }
 
@@ -44,7 +45,7 @@ impl<'de, 'a> MapAccess<'de> for ArmaClass<'a, 'de> {
             self.de.input = &self.de.input["class ".len()..];
             self.de.next_is_class = true;
             loop {
-                if crate::WHITESPACE.contains(self.de.peek_char()?) {
+                if crate::WHITESPACE.contains(self.de.peek_char()) {
                     self.de.next_char()?;
                 } else {
                     break;
@@ -55,6 +56,13 @@ impl<'de, 'a> MapAccess<'de> for ArmaClass<'a, 'de> {
         // Deserialize a map key.
         self.de.next_is_key = true;
         let key = seed.deserialize(&mut *self.de).map(Some);
+        loop {
+            if crate::WHITESPACE.contains(self.de.peek_char()) {
+                self.de.next_char()?;
+            } else {
+                break;
+            }
+        }
         self.de.next_is_key = false;
         key
     }
@@ -65,7 +73,7 @@ impl<'de, 'a> MapAccess<'de> for ArmaClass<'a, 'de> {
     {
         // clear white space
         loop {
-            if crate::WHITESPACE.contains(self.de.peek_char()?) {
+            if crate::WHITESPACE.contains(self.de.peek_char()) {
                 self.de.next_char()?;
             } else {
                 break;
@@ -75,7 +83,7 @@ impl<'de, 'a> MapAccess<'de> for ArmaClass<'a, 'de> {
             return Err(Error::ExpectedEquals);
         }
         loop {
-            if crate::WHITESPACE.contains(self.de.peek_char()?) {
+            if crate::WHITESPACE.contains(self.de.peek_char()) {
                 self.de.next_char()?;
             } else {
                 break;
@@ -83,6 +91,13 @@ impl<'de, 'a> MapAccess<'de> for ArmaClass<'a, 'de> {
         }
         // Deserialize a map value.
         let value = seed.deserialize(&mut *self.de);
+        loop {
+            if crate::WHITESPACE.contains(self.de.peek_char()) {
+                self.de.next_char()?;
+            } else {
+                break;
+            }
+        }
 
         if self.de.next_char()? != ';' {
             return Err(Error::ExpectedSemiColon);

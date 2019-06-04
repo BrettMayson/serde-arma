@@ -69,12 +69,12 @@ where
 }
 
 impl<'de> Deserializer<'de> {
-    fn peek_char(&mut self) -> Result<char> {
-        self.input.chars().next().ok_or(Error::Eof)
+    fn peek_char(&mut self) -> char {
+        self.input.chars().next().unwrap_or('?')
     }
 
     fn next_char(&mut self) -> Result<char> {
-        let ch = self.peek_char()?;
+        let ch = self.peek_char();
         self.input = &self.input[ch.len_utf8()..];
         Ok(ch)
     }
@@ -86,7 +86,7 @@ impl<'de> Deserializer<'de> {
     {
         let mut s = String::new();
         loop {
-            if DIGIT_END.contains(self.peek_char()?) {
+            if DIGIT_END.contains(self.peek_char()) {
                 return Ok(s.parse::<T>().unwrap());
             } else {
                 s.push(self.next_char()?);
@@ -101,7 +101,7 @@ impl<'de> Deserializer<'de> {
     {
         let mut s = String::new();
         loop {
-            if DIGIT_END.contains(self.peek_char()?) {
+            if DIGIT_END.contains(self.peek_char()) {
                 return Ok(s.parse::<T>().unwrap());
             } else {
                 s.push(self.next_char()?);
@@ -116,7 +116,7 @@ impl<'de> Deserializer<'de> {
     {
         let mut s = String::new();
         loop {
-            if DIGIT_END.contains(self.peek_char()?) {
+            if DIGIT_END.contains(self.peek_char()) {
                 return Ok(s.parse::<T>().unwrap());
             } else {
                 s.push(self.next_char()?);
@@ -157,13 +157,13 @@ impl<'de> Deserializer<'de> {
                     }
                 }
             }
-        } else if self.peek_char()? == '"' {
+        } else if self.peek_char() == '"' {
             self.next_char()?;
             let mut s = String::new();
             loop {
                 let c = self.next_char()?;
                 if c == '"' {
-                    if self.peek_char()? == '"' {
+                    if self.peek_char() == '"' {
                         self.next_char()?;
                         s.push('"');
                     } else {
@@ -190,7 +190,10 @@ impl<'de> Deserializer<'de> {
                     }
                     Ok(s)
                 }
-                None => Err(Error::Eof),
+                None => {
+                    println!("eof: |{}|", self.input);
+                    Err(Error::Eof)
+                },
             }
         }
     }
@@ -210,7 +213,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
             self.next_is_key = false;
             self.deserialize_str(visitor)
         } else {
-            match self.peek_char()? {
+            match self.peek_char() {
                 'n' => self.deserialize_unit(visitor),
                 't' | 'f' => self.deserialize_bool(visitor),
                 '"' => self.deserialize_str(visitor),
@@ -396,6 +399,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
+        self.next_is_class = false;
         self.deserialize_unit(visitor)
     }
 
@@ -415,10 +419,18 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
         V: Visitor<'de>,
     {
         // Parse the opening bracket of the sequence.
+        self.next_is_class = false;
         if self.next_char()? == '{' {
             // Give the visitor access to each element of the sequence.
             let value = visitor.visit_seq(CommaSeparated::new(&mut self))?;
             // Parse the closing bracket of the sequence.
+            loop {
+                if crate::WHITESPACE.contains(self.peek_char()) {
+                    self.next_char()?;
+                } else {
+                    break;
+                }
+            }
             if self.next_char()? == '}' {
                 Ok(value)
             } else {
@@ -452,8 +464,19 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
+        self.next_is_class = false;
         if self.next_char()? == '{' {
             let value = visitor.visit_map(ArmaClass::new(&mut self))?;
+            loop {
+                if WHITESPACE.contains(self.peek_char()) {
+                    self.next_char()?;
+                } else {
+                    break;
+                }
+            }
+            if self.peek_char() == '}' {
+                self.next_char()?;
+            }
             Ok(value)
         } else {
             Err(Error::ExpectedMap)
@@ -469,11 +492,22 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     where
         V: Visitor<'de>,
     {
-        if self.peek_char()? == '{' {
+        if self.peek_char() == '{' {
             self.next_char()?;
         }
         self.next_is_class = false;
-        visitor.visit_map(ArmaClass::new(&mut self))
+        let value = visitor.visit_map(ArmaClass::new(&mut self));
+        loop {
+            if WHITESPACE.contains(self.peek_char()) {
+                self.next_char()?;
+            } else {
+                break;
+            }
+        }
+        if self.peek_char() == '}' {
+            self.next_char();
+        }
+        value
     }
 
     fn deserialize_enum<V>(
@@ -486,7 +520,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
         V: Visitor<'de>,
     {
         unimplemented!();
-        /*if self.peek_char()? == '"' {
+        /*if self.peek_char() == '"' {
             // Visit a unit variant.
             visitor.visit_enum(self.parse_string()?.into_deserializer())
         } else if self.next_char()? == '{' {
